@@ -1,6 +1,9 @@
 ﻿using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
+using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,23 +22,35 @@ namespace RevitAPITrainingReadWrite
             UIDocument uidoc = uiapp.ActiveUIDocument;
             Document doc = uidoc.Document;
 
-            string wallInfo = string.Empty;
+            string pipeInfo = string.Empty;
 
-            var walls = new FilteredElementCollector(doc)
-                .OfCategory(BuiltInCategory.OST_Walls)
-                .Cast<Wall>()
+            var pipes = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_PipeCurves)
+                .Cast<Pipe>()
                 .ToList();
 
-            foreach (Wall wall in walls)
+            string exelPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "pipes.xlsx");
+
+            using (FileStream stream = new FileStream(exelPath, FileMode.Create, FileAccess.Write)) 
             {
-                string wallName = wall.get_Parameter(BuiltInParameter.WALL_STRUCTURE_ID_PARAM).AsString();
-                wallInfo += $"{wallName}\t{wall.Name}\t{wall.WallType}\t{wall.LookupParameter("Объем")}{Environment.NewLine}";
+                IWorkbook workbook = new XSSFWorkbook();
+                ISheet sheet = workbook.CreateSheet("Лист1");
+
+                int rowIndex = 0;
+
+                foreach (var pipe in pipes)
+                {
+                    sheet.SetCellValue(rowIndex, columIndex: 0, pipe.Name);
+                    sheet.SetCellValue(rowIndex, columIndex: 1, pipe.LookupParameter("Внутренний диаметр"));
+                    sheet.SetCellValue(rowIndex, columIndex: 2, pipe.LookupParameter("Внешний диаметр"));
+                    sheet.SetCellValue(rowIndex, columIndex: 3, pipe.LookupParameter("Длина"));
+                    rowIndex++;
+                }
+
+                workbook.Write(stream);
+                workbook.Close();
             }
-
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string csvPath = Path.Combine(desktopPath, "wallInfo.csv");
-
-            File.WriteAllText(csvPath, wallInfo);
+            System.Diagnostics.Process.Start(exelPath);
 
             return Result.Succeeded;
         }
